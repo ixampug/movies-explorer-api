@@ -44,7 +44,7 @@ const createMovie = (req, res, next) => {
 };
 
 const getMovies = (req, res, next) => {
-  Movie.find()
+  Movie.find({ owner: req.user._id })
     .then((movie) => {
       res.status(200).send(movie);
     })
@@ -53,64 +53,20 @@ const getMovies = (req, res, next) => {
     });
 };
 
-// function likeCard(req, res, next) {
-//   Card.findByIdAndUpdate(
-//     req.params.cardId,
-//     { $addToSet: { likes: req.user._id } },
-//     { new: true },
-//   )
-//     .then((card) => {
-//       if (!card) {
-//         next(new NotFoundError('Card not found'));
-//       } else {
-//         res.status(200).send(card);
-//       }
-//     })
-//     .catch((err) => {
-//       if (err.name === 'CastError') {
-//         next(new BadRequestError('неправильный запрос'));
-//       } else {
-//         next(new DefaultError('Ошибка сервера'));
-//       }
-//     });
-// }
-
-// function dislikeCard(req, res, next) {
-//   Card.findByIdAndUpdate(
-//     req.params.cardId,
-//     { $pull: { likes: req.user._id } },
-//     { new: true },
-//   )
-//     .then((card) => {
-//       if (!card) {
-//         next(new NotFoundError('Card not found'));
-//       } else {
-//         res.status(200).send(card);
-//       }
-//     })
-//     .catch((err) => {
-//       if (err.name === 'CastError') {
-//         next(new BadRequestError('неправильный запрос'));
-//       } else {
-//         next(new DefaultError('Ошибка сервера'));
-//       }
-//     });
-// }
-
 async function deleteMovie(req, res, next) {
   try {
-    const { cardId } = req.params;
+    const { movieId } = req.params;
     const userId = req.user._id;
-    const movie = await Movie.findById(cardId);
+    const movie = await Movie.findById(movieId);
     if (!movie) {
-      throw new NotFoundError('Карточки не существует');
+      throw new NotFoundError('Фильма не существует');
     }
     if (movie.owner.toString() !== userId) {
-      throw new ForbiddenError('Вам нельзя удалить эту карточку');
+      throw new ForbiddenError('Вам нельзя удалить этот фильм');
     }
     const deletedMovie = await Movie.deleteOne(movie);
     if (!deletedMovie) {
-      throw new NotFoundError('Карточки не существует');
+      throw new NotFoundError('Фильма не существует');
     }
     res.status(200).send({ data: deletedMovie });
   } catch (err) {
