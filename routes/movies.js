@@ -10,12 +10,19 @@ router.get('/', moviesController.getMovies);
 
 router.post('/', celebrate({
   body: Joi.object().keys({
-    name: Joi.string().required().min(2).max(30),
-    link: Joi.string()
-      .required()
-      .pattern(urlRegex),
+    country: Joi.string().required(),
+    director: Joi.string().required(),
+    duration: Joi.number().required(),
+    year: Joi.string().required(),
+    description: Joi.string().required(),
+    image: Joi.string().required().pattern(urlRegex),
+    trailerLink: Joi.string().required().pattern(urlRegex),
+    thumbnail: Joi.string().required().pattern(urlRegex),
+    movieId: Joi.number().required(),
+    nameRU: Joi.string().required(),
+    nameEN: Joi.string().required(),
   }),
-}), moviesController.createMovie);
+}), moviesController.postMovie);
 
 // router.put('/:cardId/likes', celebrate({
 //   params: Joi.object().keys({
@@ -29,9 +36,9 @@ router.post('/', celebrate({
 //   }),
 // }), moviesController.dislikeCard);
 
-router.delete('/:cardId', celebrate({
+router.delete('/:movieId', celebrate({
   params: Joi.object().keys({
-    cardId: Joi.string().length(24).hex().required(),
+    movieId: Joi.string().hex().length(24).required(),
   }),
 }), moviesController.deleteMovie);
 

@@ -4,7 +4,7 @@ const {
   NotFoundError, BadRequestError, ForbiddenError, DefaultError,
 } = require('../errors/errors');
 
-const createMovie = (req, res, next) => {
+const postMovie = (req, res, next) => {
   const {
     director,
     duration,
@@ -75,7 +75,7 @@ async function deleteMovie(req, res, next) {
 }
 
 module.exports = {
-  createMovie,
+  postMovie,
   getMovies,
   deleteMovie,
 };
