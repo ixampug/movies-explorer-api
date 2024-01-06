@@ -6,13 +6,13 @@ const auth = require('../middlewares/auth');
 const ErrorNotFound = require('../errors/errorNotFound');
 const { validateUserSingUp, validateUserSignIn } = require('../middlewares/validate');
 
-router.post('/api/signup', validateUserSingUp, createUser);
-router.post('/api/signin', validateUserSignIn, loginUser);
+router.post('/signup', validateUserSingUp, createUser);
+router.post('/signin', validateUserSignIn, loginUser);
 
 router.use(auth);
 
-router.use('/api/users', userRoutes);
-router.use('/api/movies', movieRoutes);
+router.use('/users', userRoutes);
+router.use('/movies', movieRoutes);
 
 router.use('*', auth, (req, res, next) => {
   next(new ErrorNotFound('not found'));
