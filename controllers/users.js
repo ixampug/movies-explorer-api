@@ -1,152 +1,83 @@
-/* eslint-disable no-underscore-dangle */
-/* eslint-disable eol-last */
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-
 const { NODE_ENV, JWT_SECRET } = process.env;
-
-const {
-  NotFoundError, BadRequestError, DefaultError, AlreadyExistError, UnauthorizedError,
-} = require('../errors/errors');
-
+const bcrypt = require('bcryptjs');
+const JsonWebToken = require('jsonwebtoken');
 const User = require('../models/user');
 
-const getUsers = (req, res, next) => {
-  User.find()
-    .then((users) => {
-      res.status(200).send(users);
+const ErrorBadRequest = require('../errors/errorBadRequest');
+const ErrorNotFound = require('../errors/errorNotFound');
+const ErrorConflict = require('../errors/errorConflict');
+const ErrorServer = require('../errors/errorServerNoRespond');
+const ErrorUnauthorized = require('../errors/errorUnauthorized');
+
+const loginUser = (req, res, next) => {
+  const { email, password } = req.body;
+
+  User.findOne({ email })
+    .select('+password')
+    .orFail(() => new ErrorUnauthorized('ошибка авторизации'))
+    .then((user) => {
+      bcrypt
+        .compare(password, user.password)
+        .then((isValidaUser) => {
+          if (!isValidaUser) {
+            throw new ErrorUnauthorized('неправильные данные');
+          }
+          const token = JsonWebToken.sign({ _id: user._id }, NODE_ENV === 'production' ? JWT_SECRET : 'some-secret-key', { expiresIn: '7d' });
+          return res.send({ token });
+        })
+        .catch(next);
     })
     .catch(next);
 };
 
-const getUserById = (req, res, next) => {
-  const { userId } = req.params;
-  return User
-    .findById(userId)
-    .then((r) => {
-      if (r === null) {
-        return next(new NotFoundError('user not found'));
+const getUserInfo = (req, res, next) => {
+  User.findById(req.user._id)
+    .orFail(new ErrorNotFound('Ппользователь не найден'))
+    .then((user) => res.send(user))
+    .catch((err) => next(err));
+};
+
+const updateUserInfo = (req, res, next) => {
+  const { name, email } = req.body;
+
+  User.findByIdAndUpdate(
+    req.user._id,
+    { name, email },
+    { new: true, runValidators: true },
+  )
+    .then((user) => res.send(user))
+    .catch((err) => {
+      if (err.name === 'ValidationError') {
+        next(new ErrorBadRequest('неверные данные'));
+      } else {
+        next(new ErrorServer('server err'));
       }
-      return res.status(200).send(r);
-    })
-    .catch((e) => {
-      if (e.name === 'CastError') {
-        return next(new BadRequestError('invalid ID'));
-      }
-      return next(new DefaultError('server error'));
     });
 };
 
 const createUser = (req, res, next) => {
   const {
-    name = 'Жак-Ив Кусто',
-    about = 'Исследователь',
-    avatar = 'https://pictures.s3.yandex.net/resources/jacques-cousteau_1604399756.png',
-    email,
-    password,
+    name, email, password,
   } = req.body;
 
-  bcrypt.hash(password, 10)
-    .then((hashedPassword) => User.create({
-      name,
-      about,
-      avatar,
-      email,
-      password: hashedPassword,
-    })
-      .then((user) => {
-        const userResponse = user.toObject();
-        delete userResponse.password;
-        res.status(201).send(userResponse);
-      })
-      .catch((error) => {
-        if (error.name === 'ValidationError') {
-          return next(new BadRequestError('Ошибка валидации'));
-        } if (error.code === 11000) {
-          return next(new AlreadyExistError('такой email уже используется'));
-        }
-        return next(new DefaultError('Ошибка сервера'));
-      }))
-    .catch(() => next(new DefaultError('Ошибка сервера')));
-};
-
-const updateAvatar = (req, res, next) => {
-  const { avatar } = req.body;
-  User.findByIdAndUpdate(
-    req.user._id,
-    { avatar },
-    { new: true, runValidators: true },
-  )
-    .then((updatedUser) => {
-      if (!updatedUser) {
-        return next(new NotFoundError('User not found'));
-      }
-      return res.status(200).send(updatedUser);
-    })
+  bcrypt
+    .hash(password, 10)
+    .then((hash) => User.create({
+      name, email, password: hash,
+    }))
+    .then((user) => res.status(201).send(user.toJSON()))
     .catch((err) => {
       if (err.name === 'ValidationError') {
-        return next(new BadRequestError('Validation Error'));
+        next(new ErrorBadRequest('Переданы некорректные данные.'));
+      } else if (err.code === 11000) {
+        next(new ErrorConflict('Такой e-mail уже используется'));
       }
-      return next(new DefaultError('Internal Server Error'));
+      next(err);
     });
 };
-
-const updateProfile = (req, res, next) => {
-  const { name, about } = req.body;
-  User.findByIdAndUpdate(
-    req.user._id,
-    { name, about },
-    { new: true, runValidators: true },
-  )
-    .then((updatedUser) => {
-      if (!updatedUser) {
-        return next(new NotFoundError('User not found'));
-      }
-      return res.status(200).send(updatedUser);
-    })
-    .catch((err) => {
-      if (err.name === 'ValidationError') {
-        return next(new BadRequestError('Validation Error'));
-      }
-      return next(new DefaultError('Internal Server Error'));
-    });
-};
-
-const login = (req, res, next) => {
-  const { email, password } = req.body;
-
-  User.findUserByCredentials(email, password)
-    .then((user) => {
-      if (!user) {
-        return next(new NotFoundError('пользователя не существует'));
-      }
-      const token = jwt.sign(
-        { _id: user._id },
-        NODE_ENV === 'production' ? JWT_SECRET : 'dev-secret',
-        { expiresIn: '7d' },
-      );
-      return res.status(200).send({ token });
-    })
-    .catch(() => next(new UnauthorizedError('Ошибка авторизации')));
-};
-
-const getCurrentUser = (req, res, next) => {
-  User.findById(req.user._id)
-    .then((user) => {
-      if (!user) {
-        return next(new NotFoundError('пользователя не существует'));
-      }
-      return res.status(200).send(user);
-    })
-    .catch(() => next(new DefaultError('Ошибка сервера')));
-};
-
 module.exports = {
   createUser,
-  getUserById,
-  getUsers,
-  updateAvatar,
-  updateProfile,
-  login,
-  getCurrentUser,
+  updateUserInfo,
+  loginUser,
+  getUserInfo,
 };
